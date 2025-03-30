@@ -4,6 +4,8 @@ import pprint
 
 class RaisedPlayer(BasePokerPlayer):
 
+  # passes action onto poker engine
+  # currently always raises if possible, otherwise calls
   def declare_action(self, valid_actions, hole_card, round_state):
     for i in valid_actions:
         if i["action"] == "raise":
@@ -28,4 +30,4 @@ class RaisedPlayer(BasePokerPlayer):
     pass
 
 def setup_ai():
-  return RandomPlayer()
+  return RaisedPlayer()
