@@ -1,0 +1,6 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/*
+pypokerengine/__pycache__/*
+pypokerengine/api/__pycache__/*
+pypokerengine/engine/__pycache__/*
+pypokerengine/utils/__pycache__/*
