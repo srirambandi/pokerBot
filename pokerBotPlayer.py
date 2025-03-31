@@ -13,7 +13,7 @@ class PokerBotPlayer(BasePokerPlayer):
     if len(cards) < quantity:
       return 0.0
     
-    for i in range(len(cards)):
+    for i in range(len(cards)-(quantity-1)):
       count = 1
       for j in range(i+1, len(cards)):
         if cards[i][1] == cards[j][1]:
@@ -30,17 +30,26 @@ class PokerBotPlayer(BasePokerPlayer):
     if len(cards) < 4:
       return 0.0
     
-    pairCount = 0
-    for i in range(len(cards)):
+    # find first pair
+    pairRank = None
+    for i in range(len(cards)-1):
       for j in range(i+1, len(cards)):
         if cards[i][1] == cards[j][1]:
-          pairCount += 1
+          pairRank = cards[i][1]
           break
-
-    if pairCount == 2:
-      return 1.0
-    else:
+    
+    if pairRank == None:
       return 0.0
+    
+    # find second pair
+    for i in range(len(cards)-1):
+      if cards[i][1] == pairRank:
+        continue
+      for j in range(i+1, len(cards)):
+        if cards[i][1] == cards[j][1]:
+          return 1.0
+    
+    return 0.0
     
 
   # 1 if we have a straight
@@ -54,14 +63,27 @@ class PokerBotPlayer(BasePokerPlayer):
     cards.sort(key=lambda x: valueDict[x[1]])
 
     streak = 1
-    for i in range(len(cards)-4):
-      for j in range(i+1, len(cards)):
-        if valueDict[cards[i+1][1]] == valueDict[cards[i][1]] + 1:
-          streak += 1
-          if streak == 5:
-            return 1.0
-        else:
-          streak = 1
+    for i in range(len(cards)-1):
+      # skip if same card
+      if cards[i][1] == cards[i+1][1]:
+        continue
+      # check if next card is consecutive
+      elif valueDict[cards[i+1][1]] == valueDict[cards[i][1]] + 1:
+        streak += 1
+        if streak == 5:
+          return 1.0
+      else:
+        streak = 1
+
+    # check for ace low straight (A-2-3-4-5)
+    # ? could this be done more efficiently?
+    if any(card[1] == "A" for card in cards) and \
+        any(card[1] == "2" for card in cards) and \
+        any(card[1] == "3" for card in cards) and \
+        any(card[1] == "4" for card in cards) and \
+        any(card[1] == "5" for card in cards):
+        return 1.0
+    
     return 0.0
   
 
@@ -72,22 +94,17 @@ class PokerBotPlayer(BasePokerPlayer):
     if len(cards) < 5:
       return 0.0
     
-    hearts = 0
-    diamonds = 0
-    clubs = 0
-    spades = 0
-    for i in range(len(cards)):
-      if cards[i][0] == "H":
-        hearts += 1
-      elif cards[i][0] == "D":
-        diamonds += 1
-      elif cards[i][0] == "C":
-        clubs += 1
-      elif cards[i][0] == "S":
-        spades += 1
-
-    if hearts >= 5 or diamonds >= 5 or clubs >= 5 or spades >= 5:
-      return 1.0
+    suits = ["H", "D", "C", "S"]
+    # count number of cards of each suit
+    for suit in suits:
+      count = 0
+      for i in range(len(cards)):
+        if cards[i][0] == suit:
+          count += 1
+      if count >= 5:
+        return 1.0
+      
+    return 0.0
 
   
   # 1 if we have a full house
@@ -99,7 +116,7 @@ class PokerBotPlayer(BasePokerPlayer):
     
     # find three of a kind
     threeRank = None
-    for i in range(len(cards)):
+    for i in range(len(cards)-2):
       count = 1
       for j in range(i+1, len(cards)):
         if cards[i][1] == cards[j][1]:
@@ -115,23 +132,73 @@ class PokerBotPlayer(BasePokerPlayer):
     for i in range(len(cards)):
       if cards[i][1] == threeRank:
         continue
-      count = 1
       for j in range(i+1, len(cards)):
         if cards[i][1] == cards[j][1]:
-          count += 1
-      if count >= 3:
-        threeRank = cards[i][1]
+          return 1.0
     
-    return 0.0
-    
-  # TODO implement straight flush
-  def haveStraightFlush(self, cards):
-    return 0.0
-  
-  # TODO implement royal flush
-  def haveRoyalFlush(self, cards):
     return 0.0
 
+
+  # 1 if we have a straight flush
+  # 0 if all cards are uncovered and no straight flush
+  # TODO if no straight flush rn but cards are covered, return the probability
+  def haveStraightFlush(self, cards, valueDict):
+    if len(cards) < 5:
+        return 0.0
+    
+    # check each suit
+    suits = ["H", "D", "C", "S"]
+    for suit in suits:
+        # get all cards of this suit
+        suitedCards = [card for card in cards if card[0] == suit]
+        
+        # need at least 5 cards of same suit
+        if len(suitedCards) >= 5:
+            # sort cards by rank
+            suitedCards.sort(key=lambda x: valueDict[x[1]])
+            
+            # check for straight
+            streak = 1
+            for i in range(len(suitedCards) - 1):
+                # skip if same card
+                if valueDict[suitedCards[i+1][1]] == valueDict[suitedCards[i][1]]:
+                  continue
+                # check if next card is consecutive
+                elif valueDict[suitedCards[i+1][1]] == valueDict[suitedCards[i][1]] + 1:
+                    streak += 1
+                    if streak >= 5:
+                        return 1.0
+                else:
+                    streak = 1
+            
+            # check for ace low straight (A-2-3-4-5)
+            # ? could this be done more efficiently?
+            if any(card[1] == "A" for card in suitedCards) and \
+               any(card[1] == "2" for card in suitedCards) and \
+               any(card[1] == "3" for card in suitedCards) and \
+               any(card[1] == "4" for card in suitedCards) and \
+               any(card[1] == "5" for card in suitedCards):
+                return 1.0
+    
+    return 0.0
+  
+  
+  # 1 if we have a royal flush
+  # 0 if all cards are uncovered and no royal flush
+  # TODO if no royal flush rn but cards are covered, return the probability
+  def haveRoyalFlush(self, cards):
+    if len(cards) < 5:
+        return 0.0
+    
+    # check each suit
+    suits = ["H", "D", "C", "S"]
+    for suit in suits:
+        # check if we have 10, J, Q, K, A all of the same suit
+        if all(f"{suit}{rank}" in [f"{card[0]}{card[1]}" for card in cards] 
+               for rank in ["T", "J", "Q", "K", "A"]):
+            return 1.0
+    
+    return 0.0
 
 
   # passes action onto poker engine
@@ -164,8 +231,8 @@ class PokerBotPlayer(BasePokerPlayer):
     straight = self.haveStraight(allCards, valueDict)
     flush = self.haveFlush(allCards)
     fullHouse = self.haveFullHouse(allCards)
-    straightFlush = 0.0
-    royalFlush = 0.0
+    straightFlush = self.haveStraightFlush(allCards, valueDict)
+    royalFlush = self.haveRoyalFlush(allCards)
 
     # find probabilities of different hands using only community cards
     pairC = self.haveOfAKind(round_state["community_card"], 2)
@@ -175,8 +242,8 @@ class PokerBotPlayer(BasePokerPlayer):
     straightC = self.haveStraight(round_state["community_card"], valueDict)
     flushC = self.haveFlush(round_state["community_card"])
     fullHouseC = self.haveFullHouse(round_state["community_card"])
-    straightFlushC = 0.0
-    royalFlushC = 0.0
+    straightFlushC = self.haveStraightFlush(round_state["community_card"], valueDict)
+    royalFlushC = self.haveRoyalFlush(round_state["community_card"])
 
     # totalVal: 21-28 RAISE (if possible)
     if totalVal >= 21:
