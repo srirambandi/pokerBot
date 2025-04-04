@@ -15,6 +15,9 @@ from randomplayer import RandomPlayer
 """ Example---To run testperf.py with random warrior AI against itself. 
 
 $ python testperf.py -n1 "Random Warrior 1" -a1 RandomPlayer -n2 "Random Warrior 2" -a2 RandomPlayer
+
+python3 testperf.py -n1 "Poker Bot" -a1 PokerBotPlayer -n2 "Rando" -a2 RandomPlayer
+python3 testperf.py -n1 "Poker Bot" -a1 PokerBotPlayer -n2 "Raiser" -a2 RaisedPlayer
 """
 
 def testperf(agent_name1, agent1, agent_name2, agent2):		
@@ -37,7 +40,6 @@ def testperf(agent_name1, agent1, agent_name2, agent2):
 	config.register_player(name=agent_name2, algorithm=RandomPlayer())
 	# config.register_player(name=agent_name1, algorithm=agent1())
 	# config.register_player(name=agent_name2, algorithm=agent2())
-	
 
 	# Start playing num_game games
 	for game in range(1, num_game+1):

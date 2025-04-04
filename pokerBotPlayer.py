@@ -206,7 +206,7 @@ class PokerBotPlayer(BasePokerPlayer):
   def declare_action(self, valid_actions, hole_card, round_state):
 
     print(f"CARDS:\t{hole_card}")
-    # print(f"ROUND_STATE:\t{round_state}")
+    print(f"ROUND_STATE:\t{round_state}")
 
     # sum card values to determine if we have high, mid, or low cards
     valueDict = {
@@ -234,6 +234,8 @@ class PokerBotPlayer(BasePokerPlayer):
     straightFlush = self.haveStraightFlush(allCards, valueDict)
     royalFlush = self.haveRoyalFlush(allCards)
 
+    ourHands = [1.0, pair, three, four, twoPair, straight, flush, fullHouse, straightFlush, royalFlush]
+
     # find probabilities of different hands using only community cards
     pairC = self.haveOfAKind(round_state["community_card"], 2)
     threeC = self.haveOfAKind(round_state["community_card"], 3)
@@ -245,19 +247,32 @@ class PokerBotPlayer(BasePokerPlayer):
     straightFlushC = self.haveStraightFlush(round_state["community_card"], valueDict)
     royalFlushC = self.haveRoyalFlush(round_state["community_card"])
 
+    # array holding probabilities of different hands using only community cards
+    # first element is 1.0 because we can always make a high card hand
+    communityHands = [1.0, pairC, threeC, fourC, twoPairC, straightC, flushC, fullHouseC, straightFlushC, royalFlushC]
+
+    # find best hand for us and community
+    for i in range(len(ourHands)):
+      if ourHands[i] == 1.0:
+        ourBestHand = i
+      if communityHands[i] == 1.0:
+        communityBestHand = i
+
+
     # totalVal: 21-28 RAISE (if possible)
-    if totalVal >= 21:
+    if 24 <= totalVal or ourBestHand > communityBestHand:
         for i in valid_actions:
             if i["action"] == "raise":
                 action = i["action"]
                 return action  # action returned here is sent to the poker engine
       
 
-    # totalVal: 13-20 CALL
-    if 13 <= totalVal <= 20:
+    # totalVal: 19-24 CALL
+    if 19 <= totalVal <= 24:
         return "call"  # action returned here is sent to the poker engine
             
-    # totalVal: 4-12 FOLD
+    # totalVal: 4-19 FOLD
+    # ? What is the best threshold for folding? 4? 10? 14? Pros fold about 70% preflop
     else:
         return "fold"  # action returned here is sent to the poker engine
               
