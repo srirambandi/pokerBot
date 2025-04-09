@@ -200,13 +200,25 @@ class PokerBotPlayer(BasePokerPlayer):
     
     return 0.0
 
+  # determine if it does not cost extra to stay in the hand
+  def can_call_for_free(self, valid_actions):
+    for action in valid_actions:
+        if action["action"] == "call":
+            amount = action.get("amount", None)
+            if amount == 0:
+                return True
+    return False
 
   # passes action onto poker engine
   # currently always raises if possible, otherwise calls
   def declare_action(self, valid_actions, hole_card, round_state):
 
     print(f"CARDS:\t{hole_card}")
-    print(f"ROUND_STATE:\t{round_state}")
+    #print(f"ROUND_STATE:\t{round_state}")
+
+    # check if we can call for free
+    if self.can_call_for_free(valid_actions):
+        return "call"
 
     # sum card values to determine if we have high, mid, or low cards
     valueDict = {
