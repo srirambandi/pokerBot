@@ -5,6 +5,10 @@ import pprint
 
 class PokerBotPlayer(BasePokerPlayer):
 
+  # initialize hand counter to track the number of hands played
+  def __init__(self):
+    self.hand_count = 0
+
   # for pairs, three of a kind & four of a kind
   # 1 if it exists
   # 0 if all cards are uncovered and it does not exist
@@ -209,9 +213,24 @@ class PokerBotPlayer(BasePokerPlayer):
                 return True
     return False
 
+  # basic bluffing function that randomly bluffs every 20 hands
+  def basic_bluff(self, valid_actions):
+      if self.hand_count % 2 == 0:
+          if rand.random() < .7:  # 70% chance to bluff, we may change this
+              for action in valid_actions:
+                  if action["action"] == "raise":
+                      return action  
+          for action in valid_actions:
+              if action["action"] == "call":
+                  return action
+          return None
+
   # passes action onto poker engine
   # currently always raises if possible, otherwise calls
   def declare_action(self, valid_actions, hole_card, round_state):
+
+    # increment the hand count
+    self.hand_count += 1
 
     print(f"CARDS:\t{hole_card}")
     #print(f"ROUND_STATE:\t{round_state}")
@@ -219,6 +238,11 @@ class PokerBotPlayer(BasePokerPlayer):
     # check if we can call for free
     if self.can_call_for_free(valid_actions):
         return "call"
+
+    # calls the basic bluff function to check if we should bluff
+    bluff_action = self.basic_bluff(valid_actions)
+    if bluff_action:
+        return bluff_action["action"]
 
     # sum card values to determine if we have high, mid, or low cards
     valueDict = {
