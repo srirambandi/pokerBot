@@ -287,10 +287,20 @@ class PokerBotPlayer_0_2_0(BasePokerPlayer):
     #     return "fold"
 
     # if our cards value is above the threshold, we can play, else fold
-    if threshold > self.MAX_THRESHOLD:
+    if threshold > self.MAX_THRESHOLD or self.can_call_for_free(valid_actions):
       return "defer"    # defer to the deeper strategy
     else:
       return "fold"
+
+
+  # determine if it does not cost extra to stay in the hand
+  def can_call_for_free(self, valid_actions):
+    for action in valid_actions:
+        if action["action"] == "call":
+            amount = action.get("amount", None)
+            if amount == 0:
+                return True
+    return False
 
 
   # passes action onto poker engine
@@ -372,7 +382,7 @@ class PokerBotPlayer_0_2_0(BasePokerPlayer):
       
 
     # totalVal: 19-24 CALL
-    if 19 <= totalVal <= 24:
+    if 19 <= totalVal <= 24 or self.can_call_for_free(valid_actions):
         return "call"  # action returned here is sent to the poker engine
             
     # totalVal: 4-19 FOLD
