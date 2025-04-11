@@ -235,10 +235,6 @@ class PokerBotPlayer(BasePokerPlayer):
     print(f"CARDS:\t{hole_card}")
     #print(f"ROUND_STATE:\t{round_state}")
 
-    # check if we can call for free
-    if self.can_call_for_free(valid_actions):
-        return "call"
-
     # calls the basic bluff function to check if we should bluff
     bluff_action = self.basic_bluff(valid_actions)
     if bluff_action:
@@ -304,13 +300,14 @@ class PokerBotPlayer(BasePokerPlayer):
       
 
     # totalVal: 19-24 CALL
-    if 19 <= totalVal <= 24:
+    if 19 <= totalVal <= 24 or self.can_call_for_free(valid_actions):
         return "call"  # action returned here is sent to the poker engine
             
     # totalVal: 4-19 FOLD
     # ? What is the best threshold for folding? 4? 10? 14? Pros fold about 70% preflop
     else:
         return "fold"  # action returned here is sent to the poker engine
+
               
 
 
