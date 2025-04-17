@@ -32,28 +32,26 @@ class PokerBotPlayer(BasePokerPlayer):
   # TODO if no two pair rn but cards are covered, return the probability
   def haveTwoPair(self, cards):
     if len(cards) < 4:
-      return 0.0
-    
-    # find first pair
-    pairRank = None
-    for i in range(len(cards)-1):
-      for j in range(i+1, len(cards)):
-        if cards[i][1] == cards[j][1]:
-          pairRank = cards[i][1]
-          break
-    
-    if pairRank == None:
-      return 0.0
-    
-    # find second pair
-    for i in range(len(cards)-1):
-      if cards[i][1] == pairRank:
-        continue
-      for j in range(i+1, len(cards)):
-        if cards[i][1] == cards[j][1]:
-          return 1.0
-    
-    return 0.0
+      return -4  # we need at least 4 cards to make two pair
+		
+		# count occurrences of each rank
+    rankCount = {}
+    for card in cards:
+      rank = card[1]
+      if rank in rankCount:
+        rankCount[rank] += 1
+      else:
+        rankCount[rank] = 1
+		
+    # count how many pairs we have
+    pairCount = sum(1 for count in rankCount.values() if count >= 2)
+
+    if pairCount >= 2:
+      return 1.0  # we have at least two pairs
+    elif pairCount == 1:
+      return -1  # we need one more pair
+    else:
+      return -2  # we need two pairs
     
 
   # 1 if we have a straight
@@ -61,34 +59,45 @@ class PokerBotPlayer(BasePokerPlayer):
   # TODO if no straight rn but cards are covered, return the probability
   def haveStraight(self, cards, valueDict):
     if len(cards) < 5:
-      return 0.0
+      return -5  # we need at least 5 cards to make a straight
+    
+    # extract unique ranks
+    uniqueRanks = set()
+    for card in cards:
+      uniqueRanks.add(card[1])
+    
+    # check for Ace low straight (A-2-3-4-5)
+    aceLowStraight = {"A", "2", "3", "4", "5"}
+    missingForAceLow = aceLowStraight - uniqueRanks
+    aceLowDistance = len(missingForAceLow)
     
     # sort cards by value
-    cards.sort(key=lambda x: valueDict[x[1]])
-
-    streak = 1
-    for i in range(len(cards)-1):
-      # skip if same card
-      if cards[i][1] == cards[i+1][1]:
-        continue
-      # check if next card is consecutive
-      elif valueDict[cards[i+1][1]] == valueDict[cards[i][1]] + 1:
-        streak += 1
-        if streak == 5:
-          return 1.0
-      else:
-        streak = 1
-
-    # check for ace low straight (A-2-3-4-5)
-    # ? could this be done more efficiently?
-    if any(card[1] == "A" for card in cards) and \
-        any(card[1] == "2" for card in cards) and \
-        any(card[1] == "3" for card in cards) and \
-        any(card[1] == "4" for card in cards) and \
-        any(card[1] == "5" for card in cards):
-        return 1.0
+    uniqueValues = [valueDict[rank] for rank in uniqueRanks]
+    uniqueValues.sort()
     
-    return 0.0
+    # find longest consecutive sequence
+    maxLength = 1
+    currentLength = 1
+    
+    # convert to list to handle potential gaps
+    values = list(uniqueValues)
+    
+    for i in range(1, len(values)):
+      if values[i] == values[i-1] + 1:
+        currentLength += 1
+        maxLength = max(maxLength, currentLength)
+      elif values[i] > values[i-1] + 1:
+        # Found a gap
+        currentLength = 1
+    
+    if maxLength >= 5:
+      return 1.0  # we have a straight
+    
+    # Find distance to straight (cards needed)
+    distance = 5 - maxLength
+    
+    # Return the minimum distance (either for the regular straight or ace-low straight)
+    return -min(distance, aceLowDistance)
   
 
   # 1 if we have a flush
@@ -96,113 +105,120 @@ class PokerBotPlayer(BasePokerPlayer):
   # TODO if no flush rn but cards are covered, return the probability
   def haveFlush(self, cards):
     if len(cards) < 5:
-      return 0.0
+      return -5  # we need at least 5 cards to make a flush
     
     suits = ["H", "D", "C", "S"]
     # count number of cards of each suit
+    maxCount = 0
     for suit in suits:
-      count = 0
-      for i in range(len(cards)):
-        if cards[i][0] == suit:
-          count += 1
-      if count >= 5:
-        return 1.0
+      count = sum(1 for card in cards if card[0] == suit)
+      maxCount = max(maxCount, count)
       
-    return 0.0
+    if maxCount >= 5:
+      return 1.0  # we have a flush
+    else:
+      return -(5 - maxCount)  # return negative distance to making a flush
+	
 
-  
   # 1 if we have a full house
-  # 0 if all cards are uncovered and no full house
-  # TODO if no full house rn but cards are covered, return the probability
+  # negative number representing how many cards away we are from making a full house
   def haveFullHouse(self, cards):
     if len(cards) < 5:
-      return 0.0
+      return -5  # we need at least 5 cards to make a full house
     
-    # find three of a kind
-    threeRank = None
-    for i in range(len(cards)-2):
-      count = 1
-      for j in range(i+1, len(cards)):
-        if cards[i][1] == cards[j][1]:
-          count += 1
-      if count >= 3:
-        threeRank = cards[i][1]
-
-    # fail if no three of a kind
-    if threeRank is None:
-      return 0.0
+    # count occurrences of each rank
+    rankCount = {}
+    for card in cards:
+      rank = card[1]
+      if rank in rankCount:
+        rankCount[rank] += 1
+      else:
+        rankCount[rank] = 1
     
-    # find pair separate from the three of a kind
-    for i in range(len(cards)):
-      if cards[i][1] == threeRank:
-        continue
-      for j in range(i+1, len(cards)):
-        if cards[i][1] == cards[j][1]:
-          return 1.0
+    # sort counts in descending order
+    counts = sorted(rankCount.values(), reverse=True)
     
-    return 0.0
+    if len(counts) >= 2 and counts[0] >= 3 and counts[1] >= 2:
+      return 1.0  # we have a full house
+    
+    # calculate how many cards we need to make a full house
+    if len(counts) >= 2:
+      if counts[0] >= 3:
+        # We have three of a kind, need another pair
+        if counts[1] == 1:
+          return -1  # need one more card for the pair
+        else:
+          return -2  # need two cards for the pair
+      elif counts[0] == 2 and counts[1] == 2:
+        return -1  # we have two pairs, need one more card for three of a kind
+      elif counts[0] == 2:
+        return -3  # we have a pair, need one more for the pair and one more for three of a kind
+    elif len(counts) == 1:
+      if counts[0] == 2:
+        return -3  # we have one pair, need three more cards
+      elif counts[0] == 1:
+        return -4  # we have one card of a kind, need four more cards
+    
+    return -5  # worst case: need 5 cards to make a full house
 
 
   # 1 if we have a straight flush
-  # 0 if all cards are uncovered and no straight flush
-  # TODO if no straight flush rn but cards are covered, return the probability
+  # negative number representing how many cards away we are from making a straight flush
   def haveStraightFlush(self, cards, valueDict):
     if len(cards) < 5:
-        return 0.0
+      return -5  # we need at least 5 cards to make a straight flush
     
     # check each suit
     suits = ["H", "D", "C", "S"]
-    for suit in suits:
-        # get all cards of this suit
-        suitedCards = [card for card in cards if card[0] == suit]
-        
-        # need at least 5 cards of same suit
-        if len(suitedCards) >= 5:
-            # sort cards by rank
-            suitedCards.sort(key=lambda x: valueDict[x[1]])
-            
-            # check for straight
-            streak = 1
-            for i in range(len(suitedCards) - 1):
-                # skip if same card
-                if valueDict[suitedCards[i+1][1]] == valueDict[suitedCards[i][1]]:
-                  continue
-                # check if next card is consecutive
-                elif valueDict[suitedCards[i+1][1]] == valueDict[suitedCards[i][1]] + 1:
-                    streak += 1
-                    if streak >= 5:
-                        return 1.0
-                else:
-                    streak = 1
-            
-            # check for ace low straight (A-2-3-4-5)
-            # ? could this be done more efficiently?
-            if any(card[1] == "A" for card in suitedCards) and \
-               any(card[1] == "2" for card in suitedCards) and \
-               any(card[1] == "3" for card in suitedCards) and \
-               any(card[1] == "4" for card in suitedCards) and \
-               any(card[1] == "5" for card in suitedCards):
-                return 1.0
+    bestDistance = -5  # worst case
     
-    return 0.0
-  
-  
+    for suit in suits:
+      # get all cards of this suit
+      suitedCards = [card for card in cards if card[0] == suit]
+      
+      if len(suitedCards) >= 5:
+        # We have enough cards of this suit for a straight flush
+        # Check if we have a straight with these cards
+        straightResult = self.haveStraight(suitedCards, valueDict)
+        if straightResult == 1.0:
+          return 1.0  # we have a straight flush
+        elif straightResult > bestDistance:
+          bestDistance = straightResult  # update the best distance so far
+      else:
+        # Not enough cards of this suit
+        suitDistance = -(5 - len(suitedCards))
+        if suitDistance > bestDistance:
+          bestDistance = suitDistance  # update the best distance so far
+    
+    return bestDistance
+
+
   # 1 if we have a royal flush
-  # 0 if all cards are uncovered and no royal flush
-  # TODO if no royal flush rn but cards are covered, return the probability
+  # negative number representing how many cards away we are from making a royal flush
   def haveRoyalFlush(self, cards):
     if len(cards) < 5:
-        return 0.0
+      return -5  # we need at least 5 cards to make a royal flush
     
     # check each suit
     suits = ["H", "D", "C", "S"]
-    for suit in suits:
-        # check if we have 10, J, Q, K, A all of the same suit
-        if all(f"{suit}{rank}" in [f"{card[0]}{card[1]}" for card in cards] 
-               for rank in ["T", "J", "Q", "K", "A"]):
-            return 1.0
+    bestDistance = -5  # worst case
     
-    return 0.0
+    for suit in suits:
+      royalRanks = ["T", "J", "Q", "K", "A"]
+      # Check which royal cards we have for this suit
+      missingCards = 0
+      for rank in royalRanks:
+        if not any(card[0] == suit and card[1] == rank for card in cards):
+          missingCards += 1
+      
+      if missingCards == 0:
+        return 1.0  # we have a royal flush
+      
+      distance = -missingCards
+      if distance > bestDistance:
+        bestDistance = distance  # update the best distance so far
+    
+    return bestDistance
 
   # determine if it does not cost extra to stay in the hand
   def can_call_for_free(self, valid_actions):
@@ -233,7 +249,7 @@ class PokerBotPlayer(BasePokerPlayer):
     self.hand_count += 1
 
     print(f"CARDS:\t{hole_card}")
-    #print(f"ROUND_STATE:\t{round_state}")
+    # print(f"ROUND_STATE:\t{round_state}")
 
     # calls the basic bluff function to check if we should bluff
     bluff_action = self.basic_bluff(valid_actions)
@@ -279,6 +295,12 @@ class PokerBotPlayer(BasePokerPlayer):
     straightFlushC = self.haveStraightFlush(round_state["community_card"], valueDict)
     royalFlushC = self.haveRoyalFlush(round_state["community_card"])
 
+    street = round_state["street"]
+    streetDict = {
+        "preflop": 5, "flop": 2, "turn": 1, "river": 0
+    }
+    faceDownCount = streetDict[street]
+
     # array holding probabilities of different hands using only community cards
     # first element is 1.0 because we can always make a high card hand
     communityHands = [1.0, pairC, threeC, fourC, twoPairC, straightC, flushC, fullHouseC, straightFlushC, royalFlushC]
@@ -306,6 +328,7 @@ class PokerBotPlayer(BasePokerPlayer):
     # totalVal: 4-19 FOLD
     # ? What is the best threshold for folding? 4? 10? 14? Pros fold about 70% preflop
     else:
+        # TODO dont fold if there are covered cards and we are close to a good hand
         return "fold"  # action returned here is sent to the poker engine
 
               

@@ -18,6 +18,7 @@ $ python testperf.py -n1 "Random Warrior 1" -a1 RandomPlayer -n2 "Random Warrior
 
 python3 testperf.py -n1 "Poker Bot" -a1 PokerBotPlayer -n2 "Rando" -a2 RandomPlayer
 python3 testperf.py -n1 "Poker Bot" -a1 PokerBotPlayer -n2 "Raiser" -a2 RaisedPlayer
+python3 testperf.py -n1 "oldBot" -a1 PokerBotPlayer -n2 "newBot" -a2 PokerBotPlayer_0_2_0
 """
 
 def testperf(agent_name1, agent1, agent_name2, agent2):		
