@@ -46,8 +46,8 @@ def testperf(agent_name1, agent1, agent_name2, agent2):
 	for game in range(1, num_game+1):
 		print("Game number: ", game)
 		game_result = start_poker(config, verbose=0)
-		agent1_pot = agent1_pot + game_result['players'][0]['stack']
-		agent2_pot = agent2_pot + game_result['players'][1]['stack']
+		agent1_pot = agent1_pot + game_result['players'][1]['stack']
+		agent2_pot = agent2_pot + game_result['players'][0]['stack']
 
 	print("\n After playing {} games of {} rounds, the results are: ".format(num_game, max_round))
 	# print("\n Agent 1's final pot: ", agent1_pot)
