@@ -55,8 +55,8 @@ def testperf(agent_name1, agent1, agent_name2, agent2):
 	print("\n " + agent_name2 + "'s final pot: ", agent2_pot)
 
 	print("\n ", game_result)
-	print("\n Random player's final stack: ", game_result['players'][0]['stack'])
-	print("\n " + agent_name1 + "'s final stack: ", game_result['players'][1]['stack'])
+	print("\n Random player's final stack: ", game_result['players'][1]['stack'])
+	print("\n " + agent_name1 + "'s final stack: ", game_result['players'][0]['stack'])
 
 	if (agent1_pot<agent2_pot):
 		print("\n Congratulations! " + agent_name2 + " has won.")
