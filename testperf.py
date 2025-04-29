@@ -9,6 +9,8 @@ from argparse import ArgumentParser
 
 """ =========== *Remember to import your agent!!! =========== """
 from randomplayer import RandomPlayer
+from raise_player import RaisedPlayer
+from pokerBotPlayer import PokerBotPlayer
 # from smartwarrior import SmartWarrior
 """ ========================================================= """
 
@@ -21,7 +23,7 @@ python3 testperf.py -n1 "Poker Bot" -a1 PokerBotPlayer -n2 "Raiser" -a2 RaisedPl
 python3 testperf.py -n1 "oldBot" -a1 PokerBotPlayer -n2 "newBot" -a2 PokerBotPlayer_0_2_0
 """
 
-def testperf(agent_name1, agent1, agent_name2, agent2):		
+def testperf(agent_name1, agent1_class, agent_name2, agent2_class):		
 
 	# Init to play 500 games of 1000 rounds
 	num_game = 500
@@ -36,18 +38,29 @@ def testperf(agent_name1, agent1, agent_name2, agent2):
 	# Setting configuration
 	config = setup_config(max_round=max_round, initial_stack=initial_stack, small_blind_amount=smallblind_amount)
 	
+
+    # Convert string class names to actual classes
+	player_classes = {
+        'RandomPlayer': RandomPlayer,
+        'RaisedPlayer': RaisedPlayer,
+        'PokerBotPlayer': PokerBotPlayer
+    }
+    
+	agent1 = player_classes[agent1_class]()
+	agent2 = player_classes[agent2_class]()
+
 	# Register players
-	config.register_player(name=agent_name1, algorithm=RandomPlayer())
-	config.register_player(name=agent_name2, algorithm=RandomPlayer())
-	# config.register_player(name=agent_name1, algorithm=agent1())
-	# config.register_player(name=agent_name2, algorithm=agent2())
+	# config.register_player(name=agent_name1, algorithm=RandomPlayer())
+	# config.register_player(name=agent_name2, algorithm=RandomPlayer())
+	config.register_player(name=agent_name1, algorithm=agent1)
+	config.register_player(name=agent_name2, algorithm=agent2)
 
 	# Start playing num_game games
 	for game in range(1, num_game+1):
 		print("Game number: ", game)
 		game_result = start_poker(config, verbose=0)
-		agent1_pot = agent1_pot + game_result['players'][1]['stack']
-		agent2_pot = agent2_pot + game_result['players'][0]['stack']
+		agent1_pot = agent1_pot + game_result['players'][0]['stack']
+		agent2_pot = agent2_pot + game_result['players'][1]['stack']
 
 	print("\n After playing {} games of {} rounds, the results are: ".format(num_game, max_round))
 	# print("\n Agent 1's final pot: ", agent1_pot)
@@ -55,8 +68,8 @@ def testperf(agent_name1, agent1, agent_name2, agent2):
 	print("\n " + agent_name2 + "'s final pot: ", agent2_pot)
 
 	print("\n ", game_result)
-	print("\n Random player's final stack: ", game_result['players'][1]['stack'])
-	print("\n " + agent_name1 + "'s final stack: ", game_result['players'][0]['stack'])
+	print("\n Random player's final stack: ", game_result['players'][0]['stack'])
+	print("\n " + agent_name1 + "'s final stack: ", game_result['players'][1]['stack'])
 
 	if (agent1_pot<agent2_pot):
 		print("\n Congratulations! " + agent_name2 + " has won.")
