@@ -15,8 +15,66 @@ class mctsPlayer(BasePokerPlayer):
       "9": 9, "T": 10, "J": 11, "Q": 12, "K": 13, "A": 14
     }
 
-  # TODO take hole cards and return one of 8 abstract state buckets
+  #  take hole cards and return one of 8 abstract state buckets
   def preFlopAbstraction(self, holeCards):
+
+    PRE_FLOP_CHART = [
+      # A   K   Q   J   T   9   8   7   6   5   4  3  2
+      [ 8,  8,  8,  8,  8,  7,  6,  5,  4,  4,  4, 4, 4], #A
+      [ 8,  8,  8,  8,  8,  5,  4,  3,  3,  3,  2, 2, 2], #K
+      [ 8,  6,  8,  8,  8,  5,  3,  2,  2,  2,  2, 2, 2], #Q
+      [ 8,  5,  4,  8,  8,  5,  3,  2,  2,  2,  2, 2, 2], #J
+      [ 6,  4,  3,  3,  8,  6,  3,  2,  2,  2,  2, 2, 2], #T
+      [ 4,  1,  1,  1,  1,  8,  4,  2,  2,  2,  2, 2, 2], #9
+      [ 4,  1,  1,  1,  1,  1,  8,  3,  2,  2,  2, 2, 2], #8
+      [ 3,  1,  1,  1,  1,  1,  1,  8,  2,  2,  2, 2, 2], #7
+      [ 3,  1,  1,  1,  1,  1,  1,  1,  7,  2,  2, 2, 2], #6
+      [ 3,  1,  1,  1,  1,  1,  1,  1,  1,  7,  2, 2, 2], #5
+      [ 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  6, 2, 2], #4
+      [ 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, 5, 2], #3
+      [ 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, 1, 4]  #2
+    ]
+
+    # assign ranks to cards
+    RANK_ORDER = {
+        "A": 0, "K": 1, "Q": 2, "J": 3, "T": 4, "9": 5,
+        "8": 6, "7": 7, "6": 8, "5": 9, "4": 10, "3": 11, "2": 12
+    }
+
+    # TODO this
+
+    rank1 = holeCards[0][1]
+    rank2 = holeCards[1][1]
+    val1 = self.valueDict[rank1]
+    val2 = self.valueDict[rank2]    
+
+    suited = False
+
+    if rank1 == rank2:
+      suited = True
+
+    if suited:
+      if val1 >= val2:
+        row = RANK_ORDER[rank1]
+        col = RANK_ORDER[rank2]
+      else:
+        row = RANK_ORDER[rank2]
+        col = RANK_ORDER[rank1]
+
+      return PRE_FLOP_CHART[row][col]
+
+    else:
+      if val1 <= val2:
+        row = RANK_ORDER[rank1]
+        col = RANK_ORDER[rank2]
+      else:
+        row = RANK_ORDER[rank2]
+        col = RANK_ORDER[rank1]
+
+      return PRE_FLOP_CHART[row][col]
+      
+
+
     return 1
 
 
