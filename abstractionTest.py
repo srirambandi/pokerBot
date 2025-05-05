@@ -157,58 +157,60 @@ class mctsPlayer(BasePokerPlayer):
     if len(cards) < 5:
       return (-5, None)  # we need at least 5 cards to make a straight
     
-    # extract unique ranks
-    uniqueRanks = set()
-    for card in cards:
-      uniqueRanks.add(card[1])
-    
-    # check for Ace low straight (A-2-3-4-5)
-    aceLowStraight = {"A", "2", "3", "4", "5"}
-    missingForAceLow = aceLowStraight - uniqueRanks
-    aceLowDistance = len(missingForAceLow)
-    
-    # sort cards by value
-    uniqueValues = [self.valueDict[rank] for rank in uniqueRanks]
+    # extract ranks and convert to values
+    values = [self.valueDict[card[1]] for card in cards]
+    uniqueValues = list(set(values))
     uniqueValues.sort()
     
-    # find longest consecutive sequence
-    maxLength = 1
-    currentLength = 1
-    highCard = 0
+    # check for Ace low straight (A-2-3-4-5)
+    hasAce = 14 in uniqueValues
+    hasLowStraightCards = all(val in uniqueValues for val in [2, 3, 4, 5])
     
-    # convert to list to handle potential gaps
-    values = list(uniqueValues)
+    if hasAce and hasLowStraightCards:
+      return (1, "low")  # we have A-2-3-4-5 straight
     
-    for i in range(1, len(values)):
-      if values[i] == values[i-1] + 1:
-        currentLength += 1
-        highCard = max(highCard, values[i])
-        maxLength = max(maxLength, currentLength)
-      elif values[i] > values[i-1] + 1:
-        # Found a gap
-        currentLength = 1
-        highCard = values[i]
+    # check for regular straights and near-straights
+    # we'll use a window approach to find consecutive or near-consecutive cards
+    bestRun = 1
+    maxValue = 0
+    gaps = 0
     
-    if maxLength >= 5:
-      # Determine if it's a high straight
-      if highCard >= 10:
+    for i in range(len(uniqueValues) - 1):
+      diff = uniqueValues[i+1] - uniqueValues[i]
+      if diff == 1:
+        bestRun += 1
+        maxValue = uniqueValues[i+1]
+      elif diff <= 4:  # potential gap that can be bridged
+        if gaps < 2:  # allow at most one gap for straight-1, two gaps for straight-2
+          bestRun += 1
+          gaps += diff - 1
+          maxValue = uniqueValues[i+1]
+        else:
+          # too many gaps, start a new run
+          bestRun = 1
+          gaps = 0
+      else:
+        # gap too large, start a new run
+        bestRun = 1
+        gaps = 0
+    
+    if bestRun >= 5 and gaps == 0:
+      if maxValue >= 10:
         return (1, "high")
       else:
         return (1, "low")
-    
-    # Find distance to straight (cards needed)
-    distance = 5 - maxLength
-    
-    # Return the minimum distance and classify as high or low
-    if min(distance, aceLowDistance) == distance:
-      if highCard >= 10:
-        return (-distance, "high")
+    elif bestRun >= 5 and gaps == 1:
+      if maxValue >= 10:
+        return (-1, "high")
       else:
-        return (-distance, "low")
+        return (-1, "low")
+    elif bestRun >= 5 and gaps == 2:
+      if maxValue >= 10:
+        return (-2, "high")
+      else:
+        return (-2, "low")
     else:
-      # Ace-low straight is typically considered low
-      return (-aceLowDistance, "low")
-
+      return (-3, "low")  # more than 2 cards away from a straight
 
   # 1 if we have a flush
   # negative number representing how many cards away we are from making a flush
@@ -341,32 +343,20 @@ class mctsPlayer(BasePokerPlayer):
     
     # check each suit
     suits = ["H", "D", "C", "S"]
-    bestDistance = -5  # worst case
-    bestQuality = None
+    bestResult = (-5, None)
     
     for suit in suits:
       # get all cards of this suit
       suitedCards = [card for card in cards if card[0] == suit]
       
-      if len(suitedCards) >= 5:
-        # We have enough cards of this suit for a straight flush
-        # Check if we have a straight with these cards
+      # need at least 3 cards of same suit to consider a potential straight flush
+      if len(suitedCards) >= 3:
+        # check if we have or are close to a straight with these cards
         straightResult = self.haveStraight(suitedCards)
-        if straightResult[0] == 1:
-          return (1, straightResult[1])  # we have a straight flush with the same quality
-        elif straightResult[0] > bestDistance:
-          bestDistance = straightResult[0]
-          bestQuality = straightResult[1]
-      else:
-        # Not enough cards of this suit
-        suitDistance = -(5 - len(suitedCards))
-        if suitDistance > bestDistance:
-          bestDistance = suitDistance
-          # Quality is undetermined if we don't have enough cards
-          bestQuality = None
+        if straightResult[0] > bestResult[0]:
+          bestResult = straightResult
     
-    return (bestDistance, bestQuality)
-
+    return bestResult
 
   # 1 if we have a royal flush
   # negative number representing how many cards away we are from making a royal flush
@@ -476,7 +466,7 @@ class mctsPlayer(BasePokerPlayer):
       else:
         validBuckets["straightLow"] = True
     # straight-1
-    elif straight[0] == -1 and street == "turn" or street == "flop":
+    elif straight[0] == -1 and (street == "turn" or street == "flop"):
       if straight[1] == 'high':
         validBuckets["straightHigh-1"] = True
       else:
@@ -493,7 +483,7 @@ class mctsPlayer(BasePokerPlayer):
     if flush == 1:
       validBuckets["flush"] = True
     # flush-1
-    elif flush == -1 and street == "turn" or street == "flop":
+    elif flush == -1 and (street == "turn" or street == "flop"):
       validBuckets["flush-1"] = True
     # flush-2
     elif flush == -2 and street == "flop":
@@ -521,7 +511,7 @@ class mctsPlayer(BasePokerPlayer):
     if straightFlush == 1:
       validBuckets["straightFlush"] = True
     # straightFlush-1
-    elif straightFlush == -1 and street == "turn" or street == "flop":
+    elif straightFlush == -1 and (street == "turn" or street == "flop"):
       validBuckets["straightFlush-1"] = True
 
     # royalFlush
