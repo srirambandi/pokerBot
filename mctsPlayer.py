@@ -409,11 +409,7 @@ class mctsPlayer(BasePokerPlayer):
     # default bucket
     bucket = "highCardLow"
 
-    # highCardHigh
-    for card in allCards:
-      if self.valueDict[card[1]] >= 10:
-        bucket = "highCardHigh"
-        break
+
 
     # calulate what we have
     pair = self.haveOfAKind(allCards, 2)
@@ -426,94 +422,159 @@ class mctsPlayer(BasePokerPlayer):
     straightFlush = self.haveStraightFlush(allCards)
     royalFlush = self.haveRoyalFlush(allCards)
 
+    validBuckets = {
+      "highCardLow": False, "highCardHigh": False,
+      "pairLow": False, "pairHigh": False,
+      "twoPairLowLow": False, "twoPairHighLow": False, "twoPairHighHigh": False,
+      "threeLow": False, "threeHigh": False,
+      "straightLow": False, "straightHigh": False,
+      "straightLow-1": False, "straightHigh-1": False,
+      "straightLow-2": False, "straightHigh-2": False,
+      "flush": False, "flush-1": False, "flush-2": False,
+      "fullHouseLowLow": False, "fullHouseHighLow": False, "fullHouseHighHigh": False,
+      "fourLow": False, "fourHigh": False,
+      "straightFlush": False, "straightFlush-1": False,
+      "royalFlush": False
+    }
+
+
+    # highCard
+    validBuckets["highCardLow"] = True
+    for card in allCards:
+      if self.valueDict[card[1]] >= 10:
+        validBuckets["highCardHigh"] = True
+        validBuckets["highCardLow"] = False
+        break
+
 
     # pair
     if pair[0] == 1:
       if pair[1] == 'high':
-        bucket = "pairHigh"
+        validBuckets["pairHigh"] = True
       else:
-        bucket = "pairLow"
+        validBuckets["pairLow"] = True
 
 
     # twoPair
     if twoPair[0] == 1:
       if twoPair[1] == 'highHigh':
-        bucket = "twoPairHighHigh"
+        validBuckets["twoPairHighHigh"] = True
       elif twoPair[1] == 'highLow':
-        bucket = "twoPairHighLow"
+        validBuckets["twoPairHighLow"] = True
       else:
-        bucket = "twoPairLowLow"
+        validBuckets["twoPairLowLow"] = True
 
 
     # three of a kind
     if three[0] == 1:
       if three[1] == 'high':
-        bucket = "threeHigh"
+        validBuckets["threeHigh"] = True
       else:
-        bucket = "threeLow"
+        validBuckets["threeLow"] = True
     
 
     # straight
     if straight == 1:
-      if straight[0] == 'high'
-        bucket = "straightHigh"
+      if straight[0] == 'high':
+        validBuckets["straightHigh"] = True
       else:
-        bucket = "straightLow"
+        validBuckets["straightLow"] = True
     # straight-1
     elif straight[0] == -1 and street == "turn" or street == "flop":
       if straight[1] == 'high':
-        bucket = "straightHigh-1"
+        validBuckets["straightHigh-1"] = True
       else:
-        bucket = "straightLow-1"
+        validBuckets["straightLow-1"] = True
     # staight-2
     elif straight[0] == -2 and street == "flop":
       if straight[1] == 'high':
-        bucket = "straightHigh-2"
+        validBuckets["straightHigh-2"] = True
       else:
-        bucket = "straightLow-2"
+        validBuckets["straightLow-2"] = True
 
 
     # flush
     if flush == 1:
-      bucket = "flush"
+      validBuckets["flush"] = True
     # flush-1
     elif flush == -1 and street == "turn" or street == "flop":
-      bucket = "flush-1"
+      validBuckets["flush-1"] = True
     # flush-2
     elif flush == -2 and street == "flop":
-      bucket = "flush-2"
+      validBuckets["flush-2"] = True
 
 
     # fullHouse
     if fullHouse == 1:
       if fullHouse[1] == 'highHigh':
-        bucket = "fullHouseHighHigh"
+        validBuckets["fullHouseHighHigh"] = True
       elif fullHouse[1] == 'highLow':
-        bucket = "fullHouseHighLow"
+        validBuckets["fullHouseHighLow"] = True
       else:
-        bucket = "fullHouseLowLow"
+        validBuckets["fullHouseLowLow"] = True
 
     # four of a kind
     if four[0] == 1:
       if four[1] == 'high':
-        bucket = "fourHigh"
+        validBuckets["fourHigh"] = True
       else:
-        bucket = "fourLow"
+        validBuckets["fourLow"] = True
 
 
     # straightFlush
     if straightFlush == 1:
-      bucket = "straightFlush"
+      validBuckets["straightFlush"] = True
     # straightFlush-1
     elif straightFlush == -1 and street == "turn" or street == "flop":
-      bucket = "straightFlush-1"
+      validBuckets["straightFlush-1"] = True
 
     # royalFlush
     if royalFlush == 1:
       bucket = "royalFlush"
+      validBuckets["royalFlush"] = True
       
+
+    # go through the valid buckets and find the most valuable one
+
+    if street == "flop":
+      flopValueRanking = [
+        "royalFlush", "straightFlush", "fourHigh", "fourLow",
+        "fullHouseHighHigh", "fullHouseHighLow","fullHouseLowLow",
+        "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
+        "straightFlush-1", "flush-1", "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
+        "straightHigh-1", "straightLow-1", "pairHigh", "pairLow", "flush-2",
+        "straightHigh-2", "highCardHigh", "straightLow-2", "highCardLow",
+      ]
+      for i in flopValueRanking:
+        if validBuckets[i]:
+          return i
+        
+    elif street == "turn":
+      turnValueRanking = [
+        "royalFlush", "straightFlush", "fourHigh", "fourLow",
+        "fullHouseHighHigh", "fullHouseHighLow", "fullHouseLowLow",
+        "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
+        "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
+        "straightFlush-1", "flush-1", "pairHigh", "pairLow",
+        "straightHigh-1", "straightLow-1", "highCardHigh", "highCardLow",
+      ]
+      for i in turnValueRanking:
+        if validBuckets[i]:
+          return i
+        
+    else:
+      riverValueRanking = [
+        "royalFlush", "straightFlush", "fourHigh", "fourLow",
+        "fullHouseHighHigh", "fullHouseHighLow", "fullHouseLowLow",
+        "flush", "straightHigh", "straightLow", "threeHigh","threeLow",
+        "twoPairHighHigh", "twoPairHighLow","twoPairLowLow",
+        "pairHigh", "pairLow", "highCardHigh", "highCardLow"
+      ]
+      for i in riverValueRanking:
+        if validBuckets[i]:
+          return i
     
-    return bucket
+    return "highCardLow"    # should never be reached, just in case
 
 
 
@@ -565,4 +626,4 @@ class mctsPlayer(BasePokerPlayer):
     pass
 
 def setup_ai():
-  return pokerBotPlayer()
+  return mctsPlayer()
