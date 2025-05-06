@@ -386,15 +386,40 @@ class mctsPlayer(BasePokerPlayer):
         
         return (bestDistance, "high")  # Royal flush is always categorized as high
 
-    def getAbstractState(self, allCards, street):
+
+    def getAbstractState(self, holeCards, communityCards, street):
+        allCards = holeCards + communityCards
+
         # handle preflop separately
         if street == "preflop":
-            return self.preFlopAbstraction(allCards)
+            return self.preFlopAbstraction(holeCards)
 
-        # default bucket
-        bucket = "highCardLow"
+        # Dictionary to track the best hand type with community cards only
+        bestCommunityHand = {
+            "type": "highCard",  # default is high card
+            "value": 0,          # to compare same-type hands
+            "quality": None      # high/low designation
+        }
+        
+        # Dictionary to track the best hand with all cards
+        bestAllHand = {
+            "type": "highCard",  # default is high card
+            "value": 0,          # to compare same-type hands
+            "quality": None      # high/low designation
+        }
+        
+        # calculate what we have with just community cards
+        pairComm = self.haveOfAKind(communityCards, 2)
+        threeComm = self.haveOfAKind(communityCards, 3)
+        fourComm = self.haveOfAKind(communityCards, 4)
+        twoPairComm = self.haveTwoPair(communityCards)
+        straightComm = self.haveStraight(communityCards)
+        flushComm = self.haveFlush(communityCards)
+        fullHouseComm = self.haveFullHouse(communityCards)
+        straightFlushComm = self.haveStraightFlush(communityCards)
+        royalFlushComm = self.haveRoyalFlush(communityCards)
 
-        # calculate what we have
+        # calculate what we have with all cards
         pair = self.haveOfAKind(allCards, 2)
         three = self.haveOfAKind(allCards, 3)
         four = self.haveOfAKind(allCards, 4)
@@ -405,119 +430,209 @@ class mctsPlayer(BasePokerPlayer):
         straightFlush = self.haveStraightFlush(allCards)
         royalFlush = self.haveRoyalFlush(allCards)
 
+        # Determine highest card in hole cards and community cards
+        highestHoleCard = max([self.valueDict[card[1]] for card in holeCards], default=0)
+        highestCommCard = max([self.valueDict[card[1]] for card in communityCards], default=0)
+
+        # Define hand ranking from lowest to highest
+        handRanking = [
+            "highCard", "pair", "twoPair", "three", "straight", 
+            "flush", "fullHouse", "four", "straightFlush", "royalFlush"
+        ]
+        
+        # Determine best hand with community cards only
+        if royalFlushComm[0] == 1:
+            bestCommunityHand = {"type": "royalFlush", "value": 14, "quality": "high"}
+        elif straightFlushComm[0] == 1:
+            bestCommunityHand = {"type": "straightFlush", "value": 0, "quality": straightFlushComm[1]} # Value will need to be set based on highest card
+        elif fourComm[0] == 1:
+            bestCommunityHand = {"type": "four", "value": 0, "quality": fourComm[1]} # Value will need to be the rank of the four of a kind
+        elif fullHouseComm[0] == 1:
+            bestCommunityHand = {"type": "fullHouse", "value": 0, "quality": fullHouseComm[1]} # Value will be the rank of the three of a kind
+        elif flushComm[0] == 1:
+            bestCommunityHand = {"type": "flush", "value": highestCommCard, "quality": flushComm[1]}
+        elif straightComm[0] == 1:
+            bestCommunityHand = {"type": "straight", "value": 0, "quality": straightComm[1]} # Value will be the highest card in the straight
+        elif threeComm[0] == 1:
+            bestCommunityHand = {"type": "three", "value": 0, "quality": threeComm[1]} # Value will be the rank of the three of a kind
+        elif twoPairComm[0] == 1:
+            bestCommunityHand = {"type": "twoPair", "value": 0, "quality": twoPairComm[1]} # Value will be the higher pair
+        elif pairComm[0] == 1:
+            bestCommunityHand = {"type": "pair", "value": 0, "quality": pairComm[1]} # Value will be the rank of the pair
+        else:
+            bestCommunityHand = {"type": "highCard", "value": highestCommCard, "quality": "high" if highestCommCard >= 10 else "low"}
+        
+        # Determine best hand with all cards
+        if royalFlush[0] == 1:
+            bestAllHand = {"type": "royalFlush", "value": 14, "quality": "high"}
+        elif straightFlush[0] == 1:
+            bestAllHand = {"type": "straightFlush", "value": 0, "quality": straightFlush[1]}
+        elif four[0] == 1:
+            bestAllHand = {"type": "four", "value": 0, "quality": four[1]}
+        elif fullHouse[0] == 1:
+            bestAllHand = {"type": "fullHouse", "value": 0, "quality": fullHouse[1]}
+        elif flush[0] == 1:
+            # For flush, we need to determine if the highest card in the flush is from hole or community cards
+            bestAllHand = {"type": "flush", "value": max(highestHoleCard, highestCommCard), "quality": flush[1]}
+        elif straight[0] == 1:
+            bestAllHand = {"type": "straight", "value": 0, "quality": straight[1]}
+        elif three[0] == 1:
+            bestAllHand = {"type": "three", "value": 0, "quality": three[1]}
+        elif twoPair[0] == 1:
+            bestAllHand = {"type": "twoPair", "value": 0, "quality": twoPair[1]}
+        elif pair[0] == 1:
+            bestAllHand = {"type": "pair", "value": 0, "quality": pair[1]}
+        else:
+            bestAllHand = {"type": "highCard", "value": max(highestHoleCard, highestCommCard), 
+                        "quality": "high" if max(highestHoleCard, highestCommCard) >= 10 else "low"}
+        
+        # Initialize validBuckets with communityBest flag
         validBuckets = {
+            "communityBest": False,  # Will be set to True if best hand uses community cards only
             "highCardLow": False, "highCardHigh": False,
             "pairLow": False, "pairHigh": False,
             "twoPairLowLow": False, "twoPairHighLow": False, "twoPairHighHigh": False,
             "threeLow": False, "threeHigh": False,
             "straightLow": False, "straightHigh": False,
             "straightLow-1": False, "straightHigh-1": False,
-            "straightLow-2": False, "straightHigh-2": False,
+            # Removed these two buckets:
+            # "straightLow-2": False, "straightHigh-2": False,
             "flush": False, "flush-1": False, "flush-2": False,
             "fullHouseLowLow": False, "fullHouseHighLow": False, "fullHouseHighHigh": False,
             "fourLow": False, "fourHigh": False,
             "straightFlush": False, "straightFlush-1": False,
             "royalFlush": False
         }
-
-        # highCard
-        validBuckets["highCardLow"] = True
-        for card in allCards:
-            if self.valueDict[card[1]] >= 10:
-                validBuckets["highCardHigh"] = True
-                validBuckets["highCardLow"] = False
-                break
-
-        # pair
-        if pair[0] == 1:
-            if pair[1] == 'high':
-                validBuckets["pairHigh"] = True
-            else:
-                validBuckets["pairLow"] = True
-
-        # twoPair
-        if twoPair[0] == 1:
-            if twoPair[1] == 'highHigh':
-                validBuckets["twoPairHighHigh"] = True
-            elif twoPair[1] == 'highLow':
-                validBuckets["twoPairHighLow"] = True
-            else:
-                validBuckets["twoPairLowLow"] = True
-
-        # three of a kind
-        if three[0] == 1:
-            if three[1] == 'high':
-                validBuckets["threeHigh"] = True
-            else:
-                validBuckets["threeLow"] = True
         
-        # straight - FIX: Corrected how we check the straight result
-        if straight[0] == 1:
-            if straight[1] == 'high':
-                validBuckets["straightHigh"] = True
-            else:
-                validBuckets["straightLow"] = True
-        # straight-1
-        elif straight[0] == -1 and (street == "turn" or street == "flop"):
-            if straight[1] == 'high':
-                validBuckets["straightHigh-1"] = True
-            else:
-                validBuckets["straightLow-1"] = True
-        # straight-2
-        elif straight[0] == -2 and street == "flop":
-            if straight[1] == 'high':
-                validBuckets["straightHigh-2"] = True
-            else:
-                validBuckets["straightLow-2"] = True
-
-        # flush - FIX: Corrected how we check flush result
-        if flush[0] == 1:
-            validBuckets["flush"] = True
-        # flush-1
-        elif flush[0] == -1 and (street == "turn" or street == "flop"):
-            validBuckets["flush-1"] = True
-        # flush-2
-        elif flush[0] == -2 and street == "flop":
-            validBuckets["flush-2"] = True
-
-        # fullHouse
-        if fullHouse[0] == 1:
-            if fullHouse[1] == 'highHigh':
-                validBuckets["fullHouseHighHigh"] = True
-            elif fullHouse[1] == 'highLow':
-                validBuckets["fullHouseHighLow"] = True
-            else:
-                validBuckets["fullHouseLowLow"] = True
-
-        # four of a kind
-        if four[0] == 1:
-            if four[1] == 'high':
-                validBuckets["fourHigh"] = True
-            else:
-                validBuckets["fourLow"] = True
-
-        # straightFlush - FIX: Corrected how we check straightFlush result
-        if straightFlush[0] == 1:
-            validBuckets["straightFlush"] = True
-        # straightFlush-1
-        elif straightFlush[0] == -1 and (street == "turn" or street == "flop"):
-            validBuckets["straightFlush-1"] = True
-
-        # royalFlush - FIX: Corrected how we check royalFlush result
-        if royalFlush[0] == 1:
-            validBuckets["royalFlush"] = True
+        # Compare hand rankings to determine if community cards make the best hand
+        commHandRank = handRanking.index(bestCommunityHand["type"])
+        allHandRank = handRanking.index(bestAllHand["type"])
+        
+        # Set communityBest flag if the community cards make a better or equal hand
+        if commHandRank > allHandRank:
+            # Community cards make a better hand type
+            validBuckets["communityBest"] = True
+        elif commHandRank == allHandRank:
+            # Same hand type, need to compare values/qualities
+            if bestCommunityHand["value"] >= bestAllHand["value"]:
+                # Community cards make a better or equal hand
+                validBuckets["communityBest"] = True
             
+            # For high card, check if the highest card is in community
+            if bestAllHand["type"] == "highCard" and highestCommCard >= highestHoleCard:
+                validBuckets["communityBest"] = True
+        
+        # Now set the other bucket flags based on the best hand we can make
+        if not validBuckets["communityBest"]:
+            # We can make a better hand with our hole cards, so set the corresponding bucket
+            
+            # highCard
+            if bestAllHand["type"] == "highCard":
+                if bestAllHand["quality"] == "high":
+                    validBuckets["highCardHigh"] = True
+                else:
+                    validBuckets["highCardLow"] = True
+                    
+            # pair
+            elif bestAllHand["type"] == "pair":
+                if bestAllHand["quality"] == "high":
+                    validBuckets["pairHigh"] = True
+                else:
+                    validBuckets["pairLow"] = True
+                    
+            # twoPair
+            elif bestAllHand["type"] == "twoPair":
+                if bestAllHand["quality"] == "highHigh":
+                    validBuckets["twoPairHighHigh"] = True
+                elif bestAllHand["quality"] == "highLow":
+                    validBuckets["twoPairHighLow"] = True
+                else:
+                    validBuckets["twoPairLowLow"] = True
+                    
+            # three of a kind
+            elif bestAllHand["type"] == "three":
+                if bestAllHand["quality"] == "high":
+                    validBuckets["threeHigh"] = True
+                else:
+                    validBuckets["threeLow"] = True
+                    
+            # straight
+            elif bestAllHand["type"] == "straight":
+                if bestAllHand["quality"] == "high":
+                    validBuckets["straightHigh"] = True
+                else:
+                    validBuckets["straightLow"] = True
+                    
+            # flush
+            elif bestAllHand["type"] == "flush":
+                validBuckets["flush"] = True
+                
+            # fullHouse
+            elif bestAllHand["type"] == "fullHouse":
+                if bestAllHand["quality"] == "highHigh":
+                    validBuckets["fullHouseHighHigh"] = True
+                elif bestAllHand["quality"] == "highLow":
+                    validBuckets["fullHouseHighLow"] = True
+                else:
+                    validBuckets["fullHouseLowLow"] = True
+                    
+            # four
+            elif bestAllHand["type"] == "four":
+                if bestAllHand["quality"] == "high":
+                    validBuckets["fourHigh"] = True
+                else:
+                    validBuckets["fourLow"] = True
+                    
+            # straightFlush
+            elif bestAllHand["type"] == "straightFlush":
+                validBuckets["straightFlush"] = True
+                
+            # royalFlush
+            elif bestAllHand["type"] == "royalFlush":
+                validBuckets["royalFlush"] = True
+        
+        # Check for drawing hands (-1/-2) only if they're better than what community cards offer
+        if not validBuckets["communityBest"] or (validBuckets["communityBest"] and 
+                handRanking.index(bestCommunityHand["type"]) < handRanking.index("straight")):
+            # Check for almost straight
+            if straight[0] == -1 and (street == "turn" or street == "flop"):
+                if straight[1] == "high":
+                    validBuckets["straightHigh-1"] = True
+                else:
+                    validBuckets["straightLow-1"] = True
+            # Removed this case:
+            # elif straight[0] == -2 and street == "flop":
+            #    if straight[1] == "high":
+            #        validBuckets["straightHigh-2"] = True
+            #    else:
+            #        validBuckets["straightLow-2"] = True
+        
+        if not validBuckets["communityBest"] or (validBuckets["communityBest"] and 
+                handRanking.index(bestCommunityHand["type"]) < handRanking.index("flush")):
+            # Check for almost flush
+            if flush[0] == -1 and (street == "turn" or street == "flop"):
+                validBuckets["flush-1"] = True
+            elif flush[0] == -2 and street == "flop":
+                validBuckets["flush-2"] = True
+        
+        if not validBuckets["communityBest"] or (validBuckets["communityBest"] and 
+                handRanking.index(bestCommunityHand["type"]) < handRanking.index("straightFlush")):
+            # Check for almost straight flush
+            if straightFlush[0] == -1 and (street == "turn" or street == "flop"):
+                validBuckets["straightFlush-1"] = True
+        
         # go through the valid buckets and find the most valuable one
         if street == "flop":
             flopValueRanking = [
                 "royalFlush", "straightFlush", "fourHigh", "fourLow",
-                "fullHouseHighHigh", "fullHouseHighLow","fullHouseLowLow",
+                "fullHouseHighHigh", "fullHouseHighLow", "fullHouseLowLow",
                 "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
                 "straightFlush-1", "flush-1", "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
                 "straightHigh-1", "straightLow-1", "pairHigh", "pairLow", "flush-2",
-                "straightHigh-2", "straightLow-2", "highCardHigh", "highCardLow"
+                # Removed these from ranking:
+                # "straightHigh-2", "straightLow-2",
+                "highCardHigh", "highCardLow", "communityBest"
             ]
-            # print(f"BUCKET VALUES: {validBuckets}")
             for i in flopValueRanking:
                 if validBuckets[i]:
                     return i
@@ -529,9 +644,8 @@ class mctsPlayer(BasePokerPlayer):
                 "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
                 "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
                 "straightFlush-1", "flush-1", "straightHigh-1", "straightLow-1", 
-                "pairHigh", "pairLow", "highCardHigh", "highCardLow"
+                "pairHigh", "pairLow", "highCardHigh", "highCardLow", "communityBest"
             ]
-            # print(f"BUCKET VALUES: {validBuckets}")
             for i in turnValueRanking:
                 if validBuckets[i]:
                     return i
@@ -540,31 +654,16 @@ class mctsPlayer(BasePokerPlayer):
             riverValueRanking = [
                 "royalFlush", "straightFlush", "fourHigh", "fourLow",
                 "fullHouseHighHigh", "fullHouseHighLow", "fullHouseLowLow",
-                "flush", "straightHigh", "straightLow", "threeHigh","threeLow",
-                "twoPairHighHigh", "twoPairHighLow","twoPairLowLow",
-                "pairHigh", "pairLow", "highCardHigh", "highCardLow"
+                "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
+                "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
+                "pairHigh", "pairLow", "highCardHigh", "highCardLow", "communityBest"
             ]
-            # print(f"BUCKET VALUES: {validBuckets}")
             for i in riverValueRanking:
                 if validBuckets[i]:
                     return i
         
-        return "highCardLow"    # should never be reached, just in case
+        return "highCardLow"  # should never be reached, just in case
 
-    # passes action onto poker engine
-    # currently always raises if possible, otherwise calls
-    def declareAction(self, validActions, holeCard, roundState):
-        # increment the hand count
-        self.handCount += 1
-
-        allCards = holeCard + roundState["community_card"]
-        street = roundState["street"]
-
-        # get abstract state using cards and street
-        abstractState = self.getAbstractState(allCards, street)
-
-        # this is temporary. Later we will add code to use the abstract state in an implementation of MCTS
-        return "raise" if "raise" in validActions else "call"
 
 def main():
     # create an instance of the player
@@ -586,14 +685,13 @@ def main():
 
     for street in streetDict:
         communityCardsShown = communityCards[:streetDict[street]]
-        allCards = holeCards + communityCardsShown
 
         print(f"Street: {street}")
         print(f"Community Cards: {communityCardsShown}")
         print(f"Hole Cards: {holeCards}")
 
         # get abstract state
-        abstractState = player.getAbstractState(allCards, street)
+        abstractState = player.getAbstractState(holeCards, communityCardsShown, street)
         print(f"Abstract State: {abstractState}\n")
 
 main()
