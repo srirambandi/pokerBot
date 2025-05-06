@@ -1,13 +1,10 @@
 from pypokerengine.players import BasePokerPlayer
 from time import sleep
 import random as rand
-import pprint
 
 class mctsPlayer(BasePokerPlayer):
 
     def __init__(self):
-        # initialize hand counter to track the number of hands played
-        self.handCount = 0
         # sum card values to determine if we have high, mid, or low cards
         self.valueDict = {
             "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8,
@@ -495,8 +492,6 @@ class mctsPlayer(BasePokerPlayer):
             "threeLow": False, "threeHigh": False,
             "straightLow": False, "straightHigh": False,
             "straightLow-1": False, "straightHigh-1": False,
-            # Removed these two buckets:
-            # "straightLow-2": False, "straightHigh-2": False,
             "flush": False, "flush-1": False, "flush-2": False,
             "fullHouseLowLow": False, "fullHouseHighLow": False, "fullHouseHighHigh": False,
             "fourLow": False, "fourHigh": False,
@@ -592,34 +587,67 @@ class mctsPlayer(BasePokerPlayer):
                 validBuckets["royalFlush"] = True
         
         # Check for drawing hands (-1/-2) only if they're better than what community cards offer
-        if not validBuckets["communityBest"] or (validBuckets["communityBest"] and 
-                handRanking.index(bestCommunityHand["type"]) < handRanking.index("straight")):
+        if not validBuckets["communityBest"]:
+            # Helper function to check if hole cards contribute to the hand
+            def holeCardsContribute(hand_type, value=None):
+                if hand_type == "straight":
+                    # Check if any hole card is part of the potential straight
+                    straightCards = []
+                    allValues = sorted([self.valueDict[card[1]] for card in allCards])
+                    
+                    # Find consecutive values
+                    for i in range(len(allValues) - 1):
+                        if allValues[i] + 1 == allValues[i+1] or allValues[i] == allValues[i+1]:
+                            straightCards.append(allValues[i])
+                    if len(allValues) > 0:
+                        straightCards.append(allValues[-1])
+                    
+                    return any(self.valueDict[holeCard[1]] in straightCards for holeCard in holeCards)
+                    
+                elif hand_type == "flush":
+                    # Check if any hole card contributes to the potential flush
+                    suits_count = {"H": 0, "D": 0, "C": 0, "S": 0}
+                    
+                    # Count community card suits
+                    for card in communityCards:
+                        suits_count[card[0]] += 1
+                    
+                    # Check if any hole card contributes to a potential flush
+                    for holeCard in holeCards:
+                        if suits_count[holeCard[0]] + 1 >= 3:  # At least 3 cards of the same suit
+                            return True
+                    return False
+                    
+                elif hand_type == "straightFlush":
+                    # Check if hole cards contribute to both a straight and a flush
+                    return holeCardsContribute("straight") and holeCardsContribute("flush")
+                
+                return False
+
             # Check for almost straight
             if straight[0] == -1 and (street == "turn" or street == "flop"):
-                if straight[1] == "high":
-                    validBuckets["straightHigh-1"] = True
-                else:
-                    validBuckets["straightLow-1"] = True
-            # Removed this case:
-            # elif straight[0] == -2 and street == "flop":
-            #    if straight[1] == "high":
-            #        validBuckets["straightHigh-2"] = True
-            #    else:
-            #        validBuckets["straightLow-2"] = True
-        
-        if not validBuckets["communityBest"] or (validBuckets["communityBest"] and 
-                handRanking.index(bestCommunityHand["type"]) < handRanking.index("flush")):
+                # Only set to True if hole cards contribute to the potential straight
+                if holeCardsContribute("straight"):
+                    if straight[1] == "high":
+                        validBuckets["straightHigh-1"] = True
+                    else:
+                        validBuckets["straightLow-1"] = True
+            
             # Check for almost flush
             if flush[0] == -1 and (street == "turn" or street == "flop"):
-                validBuckets["flush-1"] = True
+                # Only set to True if hole cards contribute to the potential flush
+                if holeCardsContribute("flush"):
+                    validBuckets["flush-1"] = True
             elif flush[0] == -2 and street == "flop":
-                validBuckets["flush-2"] = True
-        
-        if not validBuckets["communityBest"] or (validBuckets["communityBest"] and 
-                handRanking.index(bestCommunityHand["type"]) < handRanking.index("straightFlush")):
+                # Only set to True if hole cards contribute to the potential flush
+                if holeCardsContribute("flush"):
+                    validBuckets["flush-2"] = True
+            
             # Check for almost straight flush
             if straightFlush[0] == -1 and (street == "turn" or street == "flop"):
-                validBuckets["straightFlush-1"] = True
+                # Only set to True if hole cards contribute to the potential straight flush
+                if holeCardsContribute("straightFlush"):
+                    validBuckets["straightFlush-1"] = True
         
         # go through the valid buckets and find the most valuable one
         if street == "flop":
@@ -629,8 +657,6 @@ class mctsPlayer(BasePokerPlayer):
                 "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
                 "straightFlush-1", "flush-1", "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
                 "straightHigh-1", "straightLow-1", "pairHigh", "pairLow", "flush-2",
-                # Removed these from ranking:
-                # "straightHigh-2", "straightLow-2",
                 "highCardHigh", "highCardLow", "communityBest"
             ]
             for i in flopValueRanking:
@@ -665,6 +691,7 @@ class mctsPlayer(BasePokerPlayer):
         return "highCardLow"  # should never be reached, just in case
 
 
+
 def main():
     # create an instance of the player
     player = mctsPlayer()
@@ -677,8 +704,8 @@ def main():
 
 
     # # manually set the hole and community cards for testing
-    # communityCards = [('C', '3'), ('S', '5'), ('H', '4'), ('S', 'J'), ('H', '7')]
-    # holeCards = [('S', 'A'), ('C', '2')]
+    # communityCards = [('D', '8'), ('D', '8'), ('D', '7'), ('S', 'A'), ('D', '8')]
+    # holeCards = [('H', '5'), ('H', 'Q')]
 
     # example round state
     streetDict = {"preflop": 0, "flop": 3, "turn": 4, "river": 5}
