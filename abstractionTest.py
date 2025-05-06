@@ -483,42 +483,66 @@ class mctsPlayer(BasePokerPlayer):
             bestAllHand = {"type": "highCard", "value": max(highestHoleCard, highestCommCard), 
                         "quality": "high" if max(highestHoleCard, highestCommCard) >= 10 else "low"}
         
-        # Initialize validBuckets with communityBest flag
+        # Initialize validBuckets with updated street-specific drawing hand buckets
         validBuckets = {
-            "communityBest": False,  # Will be set to True if best hand uses community cards only
+            # Community best flags
+            "communityBestF": False,
+            "communityBestT": False,
+            "communityBestR": False,
+            
+            # Made hands
             "highCardLow": False, "highCardHigh": False,
             "pairLow": False, "pairHigh": False,
             "twoPairLowLow": False, "twoPairHighLow": False, "twoPairHighHigh": False,
             "threeLow": False, "threeHigh": False,
             "straightLow": False, "straightHigh": False,
-            "straightLow-1": False, "straightHigh-1": False,
-            "flush": False, "flush-1": False, "flush-2": False,
+            "flush": False,
             "fullHouseLowLow": False, "fullHouseHighLow": False, "fullHouseHighHigh": False,
             "fourLow": False, "fourHigh": False,
-            "straightFlush": False, "straightFlush-1": False,
-            "royalFlush": False
+            "straightFlush": False,
+            "royalFlush": False,
+            
+            # Drawing hands on the flop (-1 with 2 cards to come)
+            "straightLow-1F": False, "straightHigh-1F": False,
+            "flush-1F": False, "flush-2": False,
+            "straightFlush-1F": False,
+            
+            # Drawing hands on the turn (-1 with 1 card to come)
+            "straightLow-1T": False, "straightHigh-1T": False,
+            "flush-1T": False,
+            "straightFlush-1T": False
         }
         
         # Compare hand rankings to determine if community cards make the best hand
         commHandRank = handRanking.index(bestCommunityHand["type"])
         allHandRank = handRanking.index(bestAllHand["type"])
         
-        # Set communityBest flag if the community cards make a better or equal hand
+        # Set communityBest flag based on the current street if the community cards make a better or equal hand
+        isCommunityBest = False
         if commHandRank > allHandRank:
             # Community cards make a better hand type
-            validBuckets["communityBest"] = True
+            isCommunityBest = True
         elif commHandRank == allHandRank:
             # Same hand type, need to compare values/qualities
             if bestCommunityHand["value"] >= bestAllHand["value"]:
                 # Community cards make a better or equal hand
-                validBuckets["communityBest"] = True
+                isCommunityBest = True
             
             # For high card, check if the highest card is in community
             if bestAllHand["type"] == "highCard" and highestCommCard >= highestHoleCard:
-                validBuckets["communityBest"] = True
+                isCommunityBest = True
+        
+        # Set the appropriate communityBest flag based on the current street
+        if isCommunityBest:
+            if street == "flop":
+                validBuckets["communityBestF"] = True
+            elif street == "turn":
+                validBuckets["communityBestT"] = True
+            elif street == "river":
+                validBuckets["communityBestR"] = True
         
         # Now set the other bucket flags based on the best hand we can make
-        if not validBuckets["communityBest"]:
+        if not isCommunityBest:
             # We can make a better hand with our hole cards, so set the corresponding bucket
             
             # highCard
@@ -587,7 +611,7 @@ class mctsPlayer(BasePokerPlayer):
                 validBuckets["royalFlush"] = True
         
         # Check for drawing hands (-1/-2) only if they're better than what community cards offer
-        if not validBuckets["communityBest"]:
+        if not isCommunityBest:
             # Helper function to check if hole cards contribute to the hand
             def holeCardsContribute(hand_type, value=None):
                 if hand_type == "straight":
@@ -624,30 +648,34 @@ class mctsPlayer(BasePokerPlayer):
                 
                 return False
 
-            # Check for almost straight
-            if straight[0] == -1 and (street == "turn" or street == "flop"):
-                # Only set to True if hole cards contribute to the potential straight
-                if holeCardsContribute("straight"):
+            # Check for almost straight - separate flop (-1F) and turn (-1T) buckets
+            if straight[0] == -1 and holeCardsContribute("straight"):
+                if street == "flop":
                     if straight[1] == "high":
-                        validBuckets["straightHigh-1"] = True
+                        validBuckets["straightHigh-1F"] = True
                     else:
-                        validBuckets["straightLow-1"] = True
+                        validBuckets["straightLow-1F"] = True
+                elif street == "turn":
+                    if straight[1] == "high":
+                        validBuckets["straightHigh-1T"] = True
+                    else:
+                        validBuckets["straightLow-1T"] = True
             
-            # Check for almost flush
-            if flush[0] == -1 and (street == "turn" or street == "flop"):
-                # Only set to True if hole cards contribute to the potential flush
-                if holeCardsContribute("flush"):
-                    validBuckets["flush-1"] = True
-            elif flush[0] == -2 and street == "flop":
-                # Only set to True if hole cards contribute to the potential flush
-                if holeCardsContribute("flush"):
-                    validBuckets["flush-2"] = True
+            # Check for almost flush - separate flop (-1F) and turn (-1T) buckets
+            if flush[0] == -1 and holeCardsContribute("flush"):
+                if street == "flop":
+                    validBuckets["flush-1F"] = True
+                elif street == "turn":
+                    validBuckets["flush-1T"] = True
+            elif flush[0] == -2 and street == "flop" and holeCardsContribute("flush"):
+                validBuckets["flush-2"] = True
             
-            # Check for almost straight flush
-            if straightFlush[0] == -1 and (street == "turn" or street == "flop"):
-                # Only set to True if hole cards contribute to the potential straight flush
-                if holeCardsContribute("straightFlush"):
-                    validBuckets["straightFlush-1"] = True
+            # Check for almost straight flush - separate flop (-1F) and turn (-1T) buckets
+            if straightFlush[0] == -1 and holeCardsContribute("straightFlush"):
+                if street == "flop":
+                    validBuckets["straightFlush-1F"] = True
+                elif street == "turn":
+                    validBuckets["straightFlush-1T"] = True
         
         # go through the valid buckets and find the most valuable one
         if street == "flop":
@@ -655,9 +683,9 @@ class mctsPlayer(BasePokerPlayer):
                 "royalFlush", "straightFlush", "fourHigh", "fourLow",
                 "fullHouseHighHigh", "fullHouseHighLow", "fullHouseLowLow",
                 "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
-                "straightFlush-1", "flush-1", "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
-                "straightHigh-1", "straightLow-1", "pairHigh", "pairLow", "flush-2",
-                "highCardHigh", "highCardLow", "communityBest"
+                "straightFlush-1F", "flush-1F", "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
+                "straightHigh-1F", "straightLow-1F", "pairHigh", "pairLow", "flush-2",
+                "highCardHigh", "highCardLow", "communityBestF"
             ]
             for i in flopValueRanking:
                 if validBuckets[i]:
@@ -669,8 +697,8 @@ class mctsPlayer(BasePokerPlayer):
                 "fullHouseHighHigh", "fullHouseHighLow", "fullHouseLowLow",
                 "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
                 "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
-                "straightFlush-1", "flush-1", "straightHigh-1", "straightLow-1", 
-                "pairHigh", "pairLow", "highCardHigh", "highCardLow", "communityBest"
+                "straightFlush-1T", "flush-1T", "pairHigh", "pairLow",
+                "straightHigh-1T", "straightLow-1T", "highCardHigh", "highCardLow", "communityBestT"
             ]
             for i in turnValueRanking:
                 if validBuckets[i]:
@@ -682,7 +710,7 @@ class mctsPlayer(BasePokerPlayer):
                 "fullHouseHighHigh", "fullHouseHighLow", "fullHouseLowLow",
                 "flush", "straightHigh", "straightLow", "threeHigh", "threeLow",
                 "twoPairHighHigh", "twoPairHighLow", "twoPairLowLow",
-                "pairHigh", "pairLow", "highCardHigh", "highCardLow", "communityBest"
+                "pairHigh", "pairLow", "highCardHigh", "highCardLow", "communityBestR"
             ]
             for i in riverValueRanking:
                 if validBuckets[i]:
